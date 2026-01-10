@@ -189,15 +189,83 @@ PREPARED DATA (42 Features)
 ✓ Population → Use median value
 ```
 
-#### 2️⃣ Monotonicity Enforcement
+#### 2️⃣ Monotonicity Enforcement (Forward-Fill)
+
+**What is Forward-Fill?**
+- Technique to ensure cumulative counts never decrease
+- Uses `cummax()` to propagate last valid maximum forward
+- Critical for COVID-19 data where totals must always increase
+
+**The Problem - Real Data Errors:**
+```
+Date        Confirmed    Status
+Jan 1       1,000,000   ✓ Valid
+Jan 2       1,100,000   ✓ Increased correctly
+Jan 3         950,000   ✗ ERROR! Decreased by 150,000
+Jan 4       1,200,000   ✓ Back up
+```
+Causes: Reporting errors, data revisions, administrative corrections
+
+**The Solution:**
 ```python
-# Cumulative values should never decrease
-Confirmed_Cases[today] ≥ Confirmed_Cases[yesterday]
+df[['Confirmed', 'Deaths', 'Recovered']].cummax()
 ```
 
-#### 3️⃣ Outlier Detection
+**Before vs After:**
+```
+BEFORE (with error)     AFTER (corrected)
+Date     Confirmed      Date     Confirmed
+Jan 1    1,000,000      Jan 1    1,000,000  ✓
+Jan 2    1,100,000      Jan 2    1,100,000  ✓
+Jan 3      950,000 ✗    Jan 3    1,100,000  ✓ Forward-filled
+Jan 4    1,200,000      Jan 4    1,200,000  ✓
+
+Daily Cases: -150,000✗  Daily Cases: 0✓ (plateau)
+```
+
+**Why It Matters:**
+- ✓ Prevents negative daily calculations
+- ✓ Ensures logical consistency  
+- ✓ Improves model stability
+- ✓ Cumulative values must be ≥ previous values
+
+#### 3️⃣ Outlier Detection (99th Percentile Capping)
+
+**Why 99th Percentile Specifically?**
+
+✓ **Preserves Real Spikes**
+- COVID has legitimate extreme events (superspreader, testing backlogs)
+- 95th too aggressive → caps 5% (1 in 20 days) → loses real surges
+- 99th selective → caps 1% (1 in 100 days) → keeps authentic peaks
+
+✓ **Per-Country Adaptive**
+- Small country: 1,000 cases might be 99th percentile
+- Large country: 500,000 cases might be 99th percentile
+- Custom threshold for each region's scale
+
+✓ **Targets True Anomalies**
+```
+Percentile  Caps   Impact
+─────────────────────────────────────────
+95th        5%     Removes real outbreaks ✗
+99th        1%     Removes data errors ✓
+99.9th      0.1%   Keeps obvious errors ✗
+```
+
+**Real Example:**
+```
+Country X (100 days):
+Most days:     1,000-5,000 cases
+Outbreak week: 15,000-25,000 cases ← KEEP (real surge)
+Data glitch:   500,000 cases ← CAP (error)
+
+95th cap (~18,000): Loses outbreak peaks ✗
+99th cap (~35,000): Keeps outbreak, removes glitch ✓
+```
+
+**Implementation:**
 ```python
-# Cap extreme values at 99th percentile per country
+# Cap at 99th percentile per country/province group
 Max_Daily_Cases = quantile(Daily_Cases, 0.99)
 ```
 
@@ -319,6 +387,36 @@ From Johns Hopkins CSV Files:
 | `Deaths_per_100k` | Deaths, Population | `(Deaths/Population) × 100,000` | Per-capita mortality |
 
 **Why This Matters:** 10,000 cases means different things in China vs. Luxembourg
+
+**Why Population-Based (Not Z-score)?**
+```
+Two Normalization Strategies Used:
+
+1️⃣ POPULATION-BASED (Cases_per_100k, Deaths_per_100k)
+   Purpose: Compare countries of different sizes
+   
+   Example: 5,000 daily cases
+   • Country A (10M pop): 50 per 100k → Moderate
+   • Country B (500K pop): 1,000 per 100k → CRITICAL
+   
+   ✓ Epidemiologically valid (WHO standard)
+   ✓ Interpretable (public health thresholds)
+
+2️⃣ LOG-TRANSFORMATION (Log_Cases, Log_Deaths)
+   Purpose: Handle exponential growth patterns
+   
+   COVID growth: 1 → 10 → 100 → 1,000 → 10,000
+   • Linear scale: Hard for models to learn
+   • Log scale: Converts exponential → linear
+   
+   ✓ Reduces skewness (0 to 500,000 → 0 to 13)
+   ✓ Compresses outliers
+
+❌ NOT Z-score because:
+   • Random Forest doesn't need it (scale-invariant)
+   • Loses interpretability (stakeholders understand %, not σ)
+   • Breaks domain meaning (Cases_per_100k = 500 has WHO significance)
+```
 
 ---
 

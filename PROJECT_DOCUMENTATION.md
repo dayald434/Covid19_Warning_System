@@ -220,13 +220,78 @@ The data preparation pipeline transforms raw COVID-19 time series data into a fe
 - Province/State: Fill with "All"
 ```
 
-**2.2 Monotonicity Enforcement**
-Cumulative values must never decrease:
+**2.2 Monotonicity Enforcement (Forward-Fill)**
+
+**What is Forward-Fill?**
+
+Forward-fill (also called `ffill` or cumulative maximum) is a data imputation technique that propagates the last valid observation forward in time. In our context, we use `cummax()` to ensure cumulative COVID-19 counts never decrease.
+
+**Why It's Needed:**
+
+Real-world COVID-19 data contains errors where cumulative counts incorrectly decrease due to:
+- Reporting errors and corrections
+- Data revisions by health departments  
+- Administrative adjustments
+- Missing or delayed reports
+- System glitches
+
+**The Problem:**
+```python
+# Real data example (BAD - cumulative cases decreased!)
+Date        Country  Confirmed
+2021-01-01  USA      1,000,000  ✓ Valid
+2021-01-02  USA      1,100,000  ✓ Increased correctly
+2021-01-03  USA        950,000  ✗ ERROR! Decreased by 150,000
+2021-01-04  USA      1,200,000  ✓ Back to normal
+```
+
+**The Solution - Forward-Fill with cummax():**
 ```python
 df[['Confirmed', 'Deaths', 'Recovered']] = 
     df.groupby(['Country/Region', 'Province/State'])
       [['Confirmed', 'Deaths', 'Recovered']].cummax()
 ```
+
+**How It Works:**
+
+`cummax()` computes the cumulative maximum, effectively forward-filling any decreases:
+
+```python
+# BEFORE forward-fill (with error)
+Date        Confirmed
+2021-01-01  1,000,000
+2021-01-02  1,100,000
+2021-01-03    950,000  ← Error: decreased!
+2021-01-04  1,200,000
+
+# AFTER forward-fill (corrected)
+Date        Confirmed
+2021-01-01  1,000,000
+2021-01-02  1,100,000
+2021-01-03  1,100,000  ← Forward-filled from Day 2 (kept previous max)
+2021-01-04  1,200,000
+```
+
+**Impact on Daily Calculations:**
+
+Without forward-fill:
+```python
+Daily_Cases = Confirmed.diff()
+Day 3: 950,000 - 1,100,000 = -150,000  ✗ Invalid negative!
+```
+
+With forward-fill:
+```python
+Daily_Cases = Confirmed.diff()
+Day 3: 1,100,000 - 1,100,000 = 0  ✓ Valid (plateau)
+```
+
+**Why Monotonicity Matters:**
+1. **Logical Consistency**: Total confirmed cases cannot "un-happen"
+2. **Prevents Negative Daily Values**: Ensures Daily_Cases ≥ 0
+3. **Model Stability**: ML models train better on monotonic cumulative data
+4. **Real-World Validity**: Cumulative totals must be non-decreasing by definition
+5. **Feature Engineering**: Enables reliable growth rate calculations
 
 **2.3 Daily Change Calculation**
 ```python
@@ -243,11 +308,76 @@ Daily_Deaths = max(Daily_Deaths, 0)
 ```
 
 **2.5 Outlier Detection & Capping**
+
+**Why 99th Percentile (Not 95th or Other)?**
+
+The 99th percentile was strategically chosen to balance outlier removal with preserving legitimate extreme events:
+
+**Rationale:**
+
+1. **Preserves Real COVID-19 Spikes** 🦠
+   - COVID-19 has genuine extreme events: superspreader gatherings, testing backlogs released simultaneously, outbreak explosions
+   - 95th percentile too aggressive → caps ~5% of data (1 in 20 days) → removes real surge patterns
+   - 99th percentile selective → caps only top 1% (1 in 100 days) → targets anomalies while keeping authentic peaks
+
+2. **Per-Group Adaptive Thresholds** 🌍
+   - Calculated separately for each country/province combination
+   - What's extreme varies dramatically by population:
+     * New Zealand: 1,000 daily cases might be 99th percentile
+     * United States: 500,000 daily cases might be 99th percentile
+   - Prevents one-size-fits-all approach that would unfairly cap small countries
+
+3. **COVID Data Distribution Characteristics** 📊
+   - Heavily right-skewed distribution (long tail)
+   - Typical pattern:
+     * Most days: Moderate, consistent counts
+     * Few days: Massive spikes (real outbreaks OR data entry errors)
+   - 99th percentile captures true anomalies while retaining outbreak signals
+
+4. **Percentile Comparison:**
+   ```
+   Percentile    Caps     Impact
+   ────────────────────────────────────────────────────
+   90th          10%      Far too aggressive, removes normal variation
+   95th          5%       Caps 1 in 20 days - eliminates real surges ✗
+   99th          1%       Caps 1 in 100 days - targets anomalies ✓
+   99.9th        0.1%     Too lenient - retains obvious data errors ✗
+   ```
+
+5. **Real-World Example:**
+   ```
+   Country X Daily Cases (100-day period):
+   
+   Baseline (Days 1-80):     1,000 - 5,000 cases/day
+   Outbreak Week (Days 81-87): 15,000 - 25,000 cases/day ← REAL SURGE
+   Data Glitch (Day 92):      500,000 cases ← OBVIOUS ERROR
+   
+   With 95th percentile cap (~18,000):
+   ✗ Outbreak peaks at 25,000 get capped → Loses real signal
+   ✓ Glitch at 500,000 gets capped
+   
+   With 99th percentile cap (~35,000):
+   ✓ Outbreak peaks at 15,000-25,000 preserved → Keeps real patterns
+   ✓ Glitch at 500,000 gets capped
+   ```
+
+6. **Impact on Model Training:**
+   - Too aggressive (95th): Model never sees legitimate crisis-level surges → underestimates severe outbreaks
+   - Optimal (99th): Model learns both normal patterns AND rare-but-real extreme events
+   - Too lenient (99.9th): Model confused by data errors → poor generalization
+
+**Implementation:**
 ```python
 # Cap at 99th percentile per country/province group
 threshold = group['Daily_Cases'].quantile(0.99)
 Daily_Cases = Daily_Cases.clip(upper=threshold)
 ```
+
+**Result:**
+- Removes ~1% of extreme outliers (primarily data errors)
+- Preserves 99% of data including legitimate outbreak spikes
+- Adaptive to each geographic region's scale
+- Maintains model's ability to predict severe scenarios
 
 **2.6 Smoothing (7-day Moving Average)**
 ```python
@@ -342,6 +472,128 @@ Post-vaccine: From 2021-01-01 onwards
 ---
 
 ### Step 4: Population Normalization
+
+**Why Two Different Normalization Strategies?**
+
+This project uses **two distinct normalization approaches** for different feature types:
+
+#### 🌍 **Population-Based Normalization** (Cases_per_100k, Deaths_per_100k)
+
+**Purpose**: Make absolute counts **comparable across countries** of vastly different sizes
+
+**Rationale**:
+1. **Cross-Country Fairness**
+   - Raw counts unfairly favor large countries:
+     * USA (330M pop): 10,000 cases = routine day
+     * Iceland (340K pop): 10,000 cases = national catastrophe
+   - Per-capita normalization levels the playing field
+
+2. **Epidemiological Validity**
+   - Public health measures disease burden **per population unit**
+   - WHO reports incidence rates as "per 100,000 population"
+   - Enables meaningful cross-border comparisons
+
+3. **Real-World Example**:
+   ```
+   Scenario: Both countries report 5,000 new cases today
+   
+   Country A (Population: 10M)
+   Cases_per_100k = (5,000 / 10,000,000) × 100,000 = 50
+   Interpretation: Moderate outbreak
+   
+   Country B (Population: 500K)
+   Cases_per_100k = (5,000 / 500,000) × 100,000 = 1,000
+   Interpretation: CRITICAL outbreak (same absolute number!)
+   ```
+
+4. **When Applied**: Only to **cumulative count features** where scale differs by population
+   - ✓ Confirmed cases → Cases_per_100k
+   - ✓ Deaths → Deaths_per_100k
+   - ✗ Growth rates (already percentages)
+   - ✗ CFR (already a ratio)
+
+#### 📈 **Logarithmic Normalization** (Log_Cases, Log_Deaths)
+
+**Purpose**: Handle **exponential growth patterns** and reduce impact of extreme values
+
+**Rationale**:
+1. **COVID Follows Exponential Growth**
+   - Early stages: 1 → 2 → 4 → 8 → 16 → 32 (doubling)
+   - Linear scale: Hard for models to learn this pattern
+   - Log scale: Converts exponential to linear trend
+
+2. **Reduces Skewness**
+   ```
+   Distribution Before log(x+1):
+   Min: 0, Median: 150, Max: 500,000 (highly skewed)
+   
+   Distribution After log(x+1):
+   Min: 0, Median: 5.01, Max: 13.12 (more normal)
+   ```
+
+3. **Compresses Large Values**
+   - Prevents outliers from dominating model training
+   - log(1) = 0, log(100) = 4.6, log(10,000) = 9.2, log(1,000,000) = 13.8
+   - Difference between 100 and 10,000 cases treated similarly to 10,000 vs 1,000,000
+
+4. **When Applied**: To **daily count features** with exponential behavior
+   - ✓ Daily_Cases → Log_Cases
+   - ✓ Daily_Deaths → Log_Deaths
+   - ✗ Population (not exponential)
+   - ✗ Days_Since_100 (linear time)
+
+#### ❌ **Why NOT Z-score Standardization?**
+
+**Z-score** ((x - mean) / std) is **NOT used** in this project because:
+
+1. **Random Forest Doesn't Need It**
+   - Decision trees split on thresholds: "Is Cases_per_100k > 500?"
+   - Scale-invariant: Works equally well on [0-10,000] or [0-1] ranges
+   - Unlike SVM/Neural Networks which require standardization
+
+2. **Loses Interpretability**
+   - Z-score: "Growth_Rate = 2.3 standard deviations above mean"
+   - Original: "Growth_Rate = 15% daily increase"
+   - Stakeholders understand percentages, not z-scores
+
+3. **Breaks Domain Meaning**
+   - Cases_per_100k = 500 has epidemiological significance (WHO thresholds)
+   - Z-score = 1.2 has no medical meaning
+
+#### 🎯 **Summary: Normalization Decision Tree**
+
+```
+Feature Type Decision:
+
+┌─ Is it a COUNT feature? (Cases, Deaths)
+│  ├─ YES → Is it cumulative or daily?
+│  │  ├─ Cumulative → Population normalization (Cases_per_100k)
+│  │  └─ Daily → Log transformation (Log_Cases)
+│  └─ NO → Continue
+│
+├─ Is it a RATE/RATIO? (Growth_Rate, CFR)
+│  └─ Keep as-is (already normalized 0-1 or percentage)
+│
+├─ Is it TEMPORAL? (Days, Month, DayOfWeek)
+│  └─ Keep as-is (meaningful integers)
+│
+└─ Is it BINARY/CATEGORICAL? (Is_Lockdown, NPI_Phase)
+   └─ Keep as-is (0/1 or label encoded)
+```
+
+**Implementation**:
+```python
+# 1. Population-based (for counts)
+df['Cases_per_100k'] = (df['Confirmed'] / df['Population']) × 100,000
+df['Deaths_per_100k'] = (df['Deaths'] / df['Population']) × 100,000
+
+# 2. Logarithmic (for exponential growth)
+df['Log_Cases'] = np.log1p(df['Daily_Cases'])  # log(1 + x) handles zeros
+df['Log_Deaths'] = np.log1p(df['Daily_Deaths'])
+
+# 3. No scaling needed (Random Forest)
+# Model trains directly on mixed-scale features
+```
 
 **Process**:
 1. Map countries to 2020 population estimates
@@ -759,7 +1011,22 @@ df['Daily_Cases'] = df.groupby(['Country/Region', 'Province/State'])
 1. ✅ **Handles Non-linearity**: Complex relationships between features
 2. ✅ **Robust to Outliers**: Ensemble method reduces noise impact
 3. ✅ **Feature Importance**: Provides interpretable insights
-4. ✅ **No Feature Scaling Required**: Works with raw features
+4. ✅ **No Feature Scaling Required**: Works with raw features across different scales
+   - **Why this matters**: Our features have vastly different ranges:
+     * `Cases_per_100k`: 0 - 10,000 (population-normalized)
+     * `Growth_Rate`: -0.5 - 2.0 (percentage)
+     * `Days_Since_100`: 0 - 1,143 (temporal counter)
+     * `Log_Cases`: 0 - 13 (log-transformed)
+     * `Is_Lockdown`: 0 or 1 (binary)
+   - **Random Forest advantage**: Decision trees split on thresholds ("Is Growth_Rate > 0.15?"), which are **scale-invariant**
+   - **Alternative models that WOULD need scaling**:
+     * Neural Networks: Gradient descent fails with mixed scales
+     * SVM: Distance-based, requires standardization
+     * Logistic Regression: Coefficients uninterpretable without scaling
+   - **What we DO use instead**:
+     * Population normalization for count features (domain-specific)
+     * Log transforms for exponential growth patterns (mathematical)
+     * NO z-score standardization (preserves interpretability)
 5. ✅ **Handles Imbalance**: Class weights can be adjusted
 6. ✅ **Fast Training**: Efficient on 50k samples
 7. ✅ **Good Generalization**: Less prone to overfitting than deep models
