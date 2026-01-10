@@ -1024,18 +1024,519 @@ Top 10 most influential features:
 
 **Input Method**: Manual entry via sliders/number inputs
 
-**Required Inputs** (Top 5 features):
-- Cases per 100k population
-- Daily case growth rate (%)
-- Doubling time (days)
-- Case fatality rate (%)
-- Days since 100th case
+**Complete UI Layout**:
 
-**Output**:
-- Predicted warning level (color-coded)
-- Confidence score (probability)
-- Feature importance chart
-- Recommended actions
+**Sidebar (Left Panel)**:
+- Navigation radio buttons: 🔮 Prediction | 📊 Batch | ℹ️ About
+- Title: "COVID-19 Warning System"
+- Description: "Predict required public health actions 7 days in advance"
+- Key features list (4 bullet points)
+- Warning disclaimer: "Not a replacement for epidemiological expertise"
+- Model Information section:
+  - Trained on historical COVID-19 data
+  - 8 algorithms compared
+  - Best model selected by composite score
+  - 80/20 time-based train/test split
+- Performance metrics:
+  - Accuracy: 75-85%
+  - Critical Recall: 80-95%
+
+**Main Content (Prediction Page)**:
+
+**Header Section**:
+- Page title: "🦠 COVID-19 Early Warning System"
+- Subtitle: "Predict required public health actions 7 days in advance"
+- Description paragraph
+
+**Input Form** - "📊 Enter Current Epidemiological Data" (16 Fields Total):
+
+*Left Column (Column 1):*
+
+**Growth Dynamics** (4 inputs):
+1. Growth Rate (%/day)
+   - Type: Slider
+   - Range: -1.0 to 2.0
+   - Default: 0.10
+   - Step: 0.01
+   - Help text: "📈 Percentage change in daily cases"
+
+2. Doubling Time (days)
+   - Type: Number input
+   - Range: 1.0 to 1000.0
+   - Default: 60.0
+   - Step: 1.0
+   - Help text: "📊 Days for cases to double"
+
+3. Acceleration (/day)
+   - Type: Slider
+   - Range: -1.0 to 1.0
+   - Default: 0.0
+   - Step: 0.01
+   - Help text: "🚀 Rate of change in growth speed"
+
+4. Death Growth Rate (%/day)
+   - Type: Slider
+   - Range: -1.0 to 2.0
+   - Default: 0.02
+   - Step: 0.01
+   - Help text: "📉 Daily percentage change in deaths"
+
+**7-Day Averages** (2 inputs):
+5. Cases 7-Day MA
+   - Type: Number input
+   - Range: 0.0 to 100,000.0
+   - Default: 4,800.0
+   - Step: 100.0
+   - Help text: "📊 7-day moving average of daily cases"
+
+6. Deaths 7-Day MA
+   - Type: Number input
+   - Range: 0.0 to 5,000.0
+   - Default: 45.0
+   - Step: 5.0
+   - Help text: "📊 7-day moving average of daily deaths"
+
+**Additional Metrics** (1 input):
+7. Deaths per 100k
+   - Type: Number input
+   - Range: 0.0 to 200.0
+   - Default: 10.0
+   - Step: 1.0
+   - Help text: "💀 Deaths per 100k population"
+
+*Right Column (Column 2):*
+
+**Case Burden** (3 inputs):
+8. Daily Cases
+   - Type: Number input
+   - Range: 0 to 100,000
+   - Default: 5,000
+   - Step: 100
+   - Help text: "📈 New cases reported today"
+
+9. Daily Deaths
+   - Type: Number input
+   - Range: 0 to 5,000
+   - Default: 50
+   - Step: 5
+   - Help text: "💀 New deaths reported today"
+
+10. Cases per 100k Population
+    - Type: Number input
+    - Range: 0.0 to 5,000.0
+    - Default: 30.0
+    - Step: 1.0
+    - Help text: "📍 Cases per 100k population"
+
+**Temporal Context** (4 inputs):
+11. Days Since 100 Cases
+    - Type: Number input
+    - Range: 0 to 2,000
+    - Default: 100
+    - Step: 5
+    - Help text: "📅 Days since 100th case"
+
+12. Days Since Start
+    - Type: Number input
+    - Range: 0 to 2,000
+    - Default: 200
+    - Step: 10
+    - Help text: "📅 Days since outbreak start"
+
+13. Day of Week
+    - Type: Dropdown select
+    - Options: Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday
+    - Default: Current day
+    - Help text: "📅 Current day of week"
+
+14. Is Weekend?
+    - Type: Dropdown select
+    - Options: No, Yes
+    - Default: Auto-selected based on day
+    - Help text: "📅 Weekend indicator"
+
+**Severity Indicators** (2 inputs):
+15. Case Fatality Rate (%)
+    - Type: Slider
+    - Range: 0.0 to 15.0
+    - Default: 1.0
+    - Step: 0.1
+    - Help text: "⚰️ Deaths ÷ Cases × 100"
+
+16. Active Cases
+    - Type: Number input
+    - Range: 0 to 10,000,000
+    - Default: 100,000
+    - Step: 1,000
+    - Help text: "📊 Current active cases"
+
+**Auto-Calculated Features** (18 additional, not shown to user):
+- Population (derived from Deaths_per_100k and Daily_Deaths)
+- Confirmed (cumulative cases)
+- Deaths (cumulative deaths)
+- Recovered (calculated from Confirmed and CFR)
+- Daily_Recovered
+- Month, Quarter, Year (from current date)
+- Log_Cases, Log_Deaths (logarithmic transforms)
+- Recovery_Rate, Death_to_Case_Ratio
+- Is_Lockdown, Is_Post_Vaccine (policy context)
+- Growth_Rate_future7d, Cases_per_100k_future7d, Doubling_Time_future7d, CFR_future7d (projected values)
+
+**Action Button**:
+- "🔮 Predict Warning Level" (Primary button, full width)
+
+**Output Section** (After clicking Predict):
+
+**🎯 Prediction Results (7 Days Ahead)** - Main result display:
+
+*Left Column (1/3 width):*
+- **Warning Level Badge**:
+  - Color emoji (🔴 🟠 🟡 🟢)
+  - Level name (e.g., "CRITICAL_LOCKDOWN", "HIGH_RESTRICTIONS")
+  - Font: Large, bold
+
+- **Model Confidence Metric**:
+  - Percentage value (e.g., "92.5%")
+  - Confidence assessment:
+    - ≥80%: "✅ High confidence prediction" (green)
+    - 60-79%: "ℹ️ Moderate confidence" (blue)
+    - <60%: "⚠️ Low confidence - monitor closely" (yellow)
+
+*Right Column (2/3 width):*
+- **Situation Assessment** (info box):
+  - CRITICAL: "Immediate intervention required - implement strict emergency measures to prevent healthcare system collapse"
+  - HIGH: "Strong measures needed - enhanced social distancing and movement restrictions recommended"
+  - MODERATE: "Enhanced monitoring required - implement moderate restrictions and increase testing capacity"
+  - LOW: "Routine surveillance - maintain standard public health protocols and monitoring"
+
+**📋 Recommended Actions** - Bulleted list:
+
+*For CRITICAL*:
+- ⚠️ Implement immediate emergency measures
+- 🏥 Prepare healthcare system for surge capacity
+- 📢 Issue public health emergency alert
+- 🚫 Close non-essential businesses and schools
+- 💉 Accelerate vaccination and testing programs
+
+*For HIGH*:
+- 📊 Enhanced social distancing protocols required
+- 😷 Mandatory mask mandates in public spaces
+- 👥 Limit large gatherings (max 10-20 people)
+- 🏢 Encourage work-from-home policies
+- 🧪 Increase testing capacity by 50%
+
+*For MODERATE*:
+- 📈 Closely monitor case trends daily
+- 🏥 Ensure healthcare resources are adequate
+- 😷 Recommend masks in crowded indoor spaces
+- ✅ Maintain current restrictions
+- 📣 Public awareness campaigns
+
+*For LOW*:
+- ✅ Continue routine surveillance
+- 📊 Monitor data weekly
+- 💉 Maintain vaccination programs
+- 🏥 Standard healthcare protocols
+- 📢 Regular public health updates
+
+**📊 Detailed Risk Assessment** - Probability breakdown:
+
+Table showing all 4 warning levels with:
+- Level name
+- Color emoji
+- Progress bar (visual)
+- Percentage probability
+- Sorted by probability (highest first)
+
+Example:
+```
+🟠 HIGH_RESTRICTIONS         ████████████████████ 78.5%
+🔴 CRITICAL_LOCKDOWN        ███████              12.3%
+🟡 MODERATE_MEASURES        ██                    9.0%
+🟢 LOW_MONITORING                                 0.2%
+```
+
+**📈 Input Summary** - 4-column metric display:
+- Growth Rate: [value]
+- Cases per 100k: [value]
+- CFR: [value]
+- Deaths per 100k: [value]
+
+**ℹ️ About This Prediction** - Expandable section:
+- Model: Random Forest Classifier (100 decision trees)
+- How it works (bullet points)
+- Prediction horizon: 7 days ahead
+- Confidence level explanation
+- Important disclaimer
+
+**Error Handling**:
+- ❌ Error message if prediction fails
+- 🔍 Debug Information (expandable):
+  - Expected features list
+  - Provided features list
+  - Error details
+  - Error type
+
+---
+
+##### 2. Batch Prediction Mode
+**Purpose**: Analyze multiple scenarios from CSV upload
+
+**Complete UI Layout**:
+
+**Header**:
+- Page title: "📊 Batch Predictions"
+- Subtitle: "Upload CSV file for multiple predictions"
+- Info box: "Upload a CSV file with the same features used in training. The system will predict warning levels for all rows."
+
+**File Upload Section**:
+- File uploader component
+- Accepted format: CSV only
+- Label: "Choose a CSV file"
+
+**After Upload**:
+- Success message: "✅ File loaded: [N] records"
+- **Preview of uploaded data**:
+  - Subheader
+  - Data table (first 10 rows)
+
+**Action Button**:
+- "🔮 Run Batch Predictions" (Primary button)
+
+**Results Section** (After clicking button):
+
+If successful:
+- Success message: "✅ Predictions complete!"
+- **Results** subheader
+- Full data table with new columns:
+  - Predicted_Warning_Level
+  - Confidence (if available)
+
+**Download Button**:
+- "📥 Download Results CSV"
+- Filename: covid_predictions.csv
+- Format: CSV with UTF-8 encoding
+
+**Summary Statistics** - 4-column display:
+- 🔴 Critical: [count]
+- 🟠 High: [count]
+- 🟡 Moderate: [count]
+- 🟢 Low: [count]
+
+**Error Handling**:
+- ❌ Missing features error with list
+- ❌ File processing error with details
+
+---
+
+##### 3. About Page
+**Purpose**: Explain system methodology and limitations
+
+**Complete UI Content**:
+
+**Header**: "ℹ️ About This System"
+
+**Sections** (in order):
+
+**COVID-19 Early Warning System** (Main heading)
+
+**Purpose** (H3):
+- Description of 7-day advance prediction
+- Policymaker decision support goal
+
+**How It Works** (H3):
+1. Input Current Metrics
+2. ML Prediction
+3. 7-Day Forecast
+4. Actionable Output
+
+**Risk Scoring System** (H3):
+- Growth Rate (40%)
+- Case Burden (30%)
+- Doubling Time (20%)
+- Case Fatality Rate (10%)
+
+**Warning Levels** (H3):
+- Table with 4 rows:
+  | Level | Risk Score | Action Required |
+  - 🔴 CRITICAL | ≥10 | Immediate lockdown
+  - 🟠 HIGH | 6-9 | Strong restrictions
+  - 🟡 MODERATE | 3-5 | Enhanced monitoring
+  - 🟢 LOW | 0-2 | Routine surveillance
+
+**Model Performance** (H3):
+- Dataset: 337,185 total → 10,071 valid samples
+- Training: 8,066 samples (80%)
+- Testing: 2,005 samples (20%)
+- Countries: 201
+- Algorithm: Random Forest (100 trees)
+- Optimization: Critical situation detection
+- Critical Recall: 91.7%
+
+**Data Sources** (H3):
+- Johns Hopkins University CSSE COVID-19
+  - Daily confirmed cases
+  - Daily deaths
+  - Daily recovered cases
+  - Geographic information
+
+**Limitations** (H3):
+⚠️ Important Notes (bulleted):
+- Historical data training
+- Requires accurate inputs
+- Complements expert judgment
+- Depends on data quality
+- Not validated for real-time deployment
+
+**Technical Stack** (H3):
+- ML Framework: scikit-learn
+- Model: Random Forest Classifier
+- Interface: Streamlit
+- Data Processing: pandas, numpy
+
+**Footer**:
+- Horizontal rule
+- "Developed as an early warning decision support tool for public health officials"
+
+---
+
+##### 4. UI Color Scheme & Icons
+
+**Warning Level Colors**:
+- 🔴 CRITICAL: Red circle
+- 🟠 HIGH: Orange circle
+- 🟡 MODERATE: Yellow circle
+- 🟢 LOW: Green circle
+
+**Page Icons**:
+- 🔮 Prediction page
+- 📊 Batch page
+- ℹ️ About page
+
+**Action Icons**:
+- ⚠️ Warnings
+- ✅ Success
+- ❌ Errors
+- 📈 Metrics
+- 📋 Recommendations
+- 💉 Healthcare
+- 😷 Masks
+- 🏥 Hospitals
+- 📢 Announcements
+
+**Confidence Indicators**:
+- ✅ High confidence (green success box)
+- ℹ️ Moderate confidence (blue info box)
+- ⚠️ Low confidence (yellow warning box)
+
+---
+
+##### 5. Interactive Elements
+
+**Sliders** (4 total):
+- Growth Rate
+- Acceleration
+- Death Growth Rate
+- Case Fatality Rate
+
+**Number Inputs** (10 total):
+- Doubling Time
+- Cases 7d MA
+- Deaths 7d MA
+- Deaths per 100k
+- Daily Cases
+- Daily Deaths
+- Cases per 100k
+- Days Since 100
+- Days Since Start
+- Active Cases
+
+**Dropdowns** (2 total):
+- Day of Week (7 options)
+- Is Weekend (2 options)
+
+**Buttons**:
+- Predict Warning Level (primary)
+- Run Batch Predictions (primary)
+- Download Results CSV (download)
+
+**Expandable Sections**:
+- About This Prediction
+- Debug Information (error case)
+
+**Progress Bars**:
+- 4 bars showing probability for each warning level
+
+**Data Tables**:
+- Batch upload preview (10 rows)
+- Full results table (all rows)
+
+---
+
+##### 6. Responsive Layout
+
+**Column Layouts**:
+- Input form: 2 columns (left/right)
+- Prediction results: 2 columns (1/3 + 2/3 split)
+- Input summary: 4 columns (equal width)
+- Probability bars: 2 columns (3:1 ratio)
+- Summary statistics: 4 columns (equal width)
+
+**Width Settings**:
+- Page layout: "wide"
+- Sidebar: Expanded by default
+
+---
+
+##### 7. Session State & Caching
+
+**Cached Resources**:
+- `@st.cache_resource`: Model loading (loads once, persists across sessions)
+- Model artifact remains in memory until app restart
+
+**No Session State**:
+- Each prediction is independent
+- No user data stored between interactions
+
+---
+
+##### 8. User Experience Flow
+
+**Typical User Journey - Single Prediction**:
+1. Land on app → Prediction page loads
+2. See sidebar with navigation and info
+3. View 16 input fields with helpful tooltips
+4. Adjust sliders and number inputs
+5. Click "Predict Warning Level" button
+6. Wait 0.2-0.5 seconds for processing
+7. See color-coded warning level result
+8. Review confidence score
+9. Read recommended actions
+10. Check detailed probability breakdown
+11. Verify input summary
+12. Optionally expand "About This Prediction"
+
+**Typical User Journey - Batch Upload**:
+1. Click "📊 Batch" in sidebar
+2. See upload interface
+3. Click "Choose a CSV file"
+4. Select file from computer
+5. See success message + preview (10 rows)
+6. Click "Run Batch Predictions"
+7. Wait 1-5 seconds (depending on size)
+8. See "Predictions complete!" message
+9. Review results table
+10. Check summary statistics
+11. Click "Download Results CSV"
+12. Save file to computer
+
+**Typical User Journey - About Page**:
+1. Click "ℹ️ About" in sidebar
+2. Scroll through information sections
+3. Read methodology
+4. Review performance metrics
+5. Note limitations
+6. Return to Prediction page
 
 **Example Use Case**:
 ```
