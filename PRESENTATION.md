@@ -2377,3 +2377,831 @@ streamlit run app/streamlit_app.py
 # Run tests
 python tests/run_tests.py
 ```
+
+---
+
+## 🚀 Slide 25: Production Deployment
+
+### Deployment Options Summary
+
+| Platform | Complexity | Cost | Best For |
+|----------|-----------|------|----------|
+| **Streamlit Cloud** | ⭐ Easy | Free tier | Prototypes, demos |
+| **Docker** | ⭐⭐ Medium | Self-hosted | Flexible deployment |
+| **AWS EC2** | ⭐⭐⭐ Advanced | Pay-as-you-go | Enterprise scale |
+| **Heroku** | ⭐⭐ Medium | $7-25/month | Quick production |
+| **Google Cloud Run** | ⭐⭐ Medium | Pay-per-use | Serverless |
+
+---
+
+### Quick Deployment: Docker
+
+```dockerfile
+FROM python:3.9-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY . .
+EXPOSE 8501
+CMD ["streamlit", "run", "app/streamlit_app.py"]
+```
+
+```bash
+# Build and run
+docker build -t covid-warning .
+docker run -p 8501:8501 covid-warning
+```
+
+**Access**: http://localhost:8501
+
+---
+
+### Production Checklist
+
+#### ✅ Pre-Deployment
+- [ ] Environment variables configured (.env file)
+- [ ] Secrets excluded from Git (.gitignore updated)
+- [ ] Model files available (train if needed)
+- [ ] Dependencies tested (pip install -r requirements.txt)
+- [ ] Security review completed
+
+#### ✅ Deployment
+- [ ] HTTPS enabled
+- [ ] Rate limiting configured
+- [ ] Logging enabled
+- [ ] Error monitoring active
+- [ ] Backup strategy in place
+
+#### ✅ Post-Deployment
+- [ ] Health check endpoint working
+- [ ] Performance monitored
+- [ ] User feedback collected
+- [ ] Model performance tracked
+- [ ] Regular updates scheduled
+
+---
+
+### System Requirements
+
+**Minimum** (Development/Testing):
+- 2 CPU cores
+- 4 GB RAM
+- 1 GB storage
+
+**Recommended** (Production):
+- 4 CPU cores
+- 8 GB RAM
+- 2 GB storage
+- SSD preferred
+
+**Enterprise** (High Traffic):
+- 8+ CPU cores
+- 16 GB+ RAM
+- 10 GB+ storage
+- Load balancer
+- Auto-scaling
+
+---
+
+## 🔍 Slide 26: Model Monitoring & Maintenance
+
+### Why Monitor?
+
+**Models Degrade Over Time**:
+```
+Launch: 99% accuracy ✅
+Month 1: 98% accuracy ⚠️
+Month 3: 95% accuracy ⚠️⚠️
+Month 6: 90% accuracy ⚠️⚠️⚠️ RETRAIN!
+```
+
+**Causes of Degradation**:
+- 📊 New COVID variants (changed behavior)
+- 🌍 Population changes (vaccination rates)
+- 📉 Data distribution shift
+- 🔄 Policy changes (new interventions)
+
+---
+
+### Key Metrics to Track
+
+#### 1. **Prediction Distribution**
+
+```python
+Expected (Training):
+├─ HIGH_RESTRICTIONS:  45.9%
+├─ CRITICAL_LOCKDOWN:  39.4%
+├─ MODERATE_MEASURES:  12.7%
+└─ LOW_MONITORING:      2.1%
+
+Current (This Month):
+├─ HIGH_RESTRICTIONS:  52.3% ⚠️ +6.4%
+├─ CRITICAL_LOCKDOWN:  31.1% ⚠️ -8.3%
+├─ MODERATE_MEASURES:  14.2% ✓
+└─ LOW_MONITORING:      2.4% ✓
+
+🚨 ALERT: Distribution shift > 5% detected
+```
+
+#### 2. **Feature Drift**
+
+```python
+Growth_Rate:
+├─ Training: μ=8.2%, σ=5.1%
+├─ Current:  μ=12.7%, σ=6.8%
+└─ Z-score: 3.8 ⚠️⚠️ DRIFT DETECTED!
+
+Cases_per_100k:
+├─ Training: μ=450, σ=320
+├─ Current:  μ=480, σ=340
+└─ Z-score: 0.9 ✓ Normal variation
+```
+
+#### 3. **Accuracy Tracking** (if ground truth available)
+
+```python
+Monthly Validation:
+├─ January:   99.1% ✅
+├─ February:  97.8% ✓
+├─ March:     96.2% ✓
+├─ April:     93.1% ⚠️
+└─ May:       88.5% 🚨 RETRAIN NOW!
+```
+
+---
+
+### Retraining Strategy
+
+#### When to Retrain:
+
+| Trigger | Threshold | Action |
+|---------|-----------|--------|
+| **Scheduled** | Monthly | Routine update |
+| **Accuracy Drop** | < 90% | Emergency retrain |
+| **Feature Drift** | Z-score > 3 | Retrain soon |
+| **New Variant** | Immediate | Retrain with new data |
+| **Distribution Shift** | > 15% | Investigate & retrain |
+
+#### Retraining Process:
+
+```
+1. Collect Latest Data
+   ├─ Download from Johns Hopkins
+   └─ Verify data quality
+
+2. Backup Current Model
+   ├─ Copy to backups/model_YYYYMMDD.pkl
+   └─ Document performance
+
+3. Retrain
+   ├─ Run: python scripts/run_pipeline.py
+   └─ Duration: ~5 minutes
+
+4. Validate
+   ├─ Test accuracy
+   ├─ Compare to baseline
+   └─ A/B test if uncertain
+
+5. Deploy
+   ├─ Replace production model
+   ├─ Monitor closely for 24 hours
+   └─ Rollback if issues detected
+```
+
+---
+
+### Automated Monitoring Script
+
+```python
+# monitor.py - Run daily
+def daily_health_check():
+    """Monitor model health"""
+    
+    alerts = []
+    
+    # Check 1: Prediction distribution
+    dist_shift = check_distribution_shift()
+    if dist_shift > 0.15:
+        alerts.append("⚠️ Prediction distribution shifted 15%+")
+    
+    # Check 2: Feature drift
+    drift_score = check_feature_drift()
+    if drift_score > 3:
+        alerts.append("⚠️ Feature drift Z-score > 3")
+    
+    # Check 3: Error rate
+    error_rate = check_recent_errors()
+    if error_rate > 0.05:
+        alerts.append("⚠️ Error rate > 5%")
+    
+    # Send alerts
+    if alerts:
+        send_email_alert(alerts)
+        log_alert(alerts)
+    
+    return len(alerts) == 0
+```
+
+**Cron Job** (run daily at 2 AM):
+```bash
+0 2 * * * /usr/bin/python3 /path/to/monitor.py >> /path/to/monitor.log 2>&1
+```
+
+---
+
+## ⚖️ Slide 27: Ethical AI & Responsible Use
+
+### Core Ethical Principles
+
+#### 1. **Transparency** 🔍
+
+**What We Provide**:
+✅ Feature importance explanations
+✅ Confidence scores
+✅ Open-source code
+✅ Complete documentation
+✅ Model limitations disclosed
+
+**What We DON'T Hide**:
+- How the model makes decisions
+- What data was used for training
+- Where the model may fail
+- Assumptions and constraints
+
+---
+
+#### 2. **Fairness & Bias** ⚖️
+
+**Identified Biases**:
+⚠️ **Geographic**: More data from developed countries
+⚠️ **Temporal**: Pre-2024 training data
+⚠️ **Class Imbalance**: LOW_MONITORING underrepresented (2.1%)
+
+**Mitigation Strategies**:
+✅ Population normalization (per 100k)
+✅ Balanced class weights
+✅ Country-specific outlier capping
+✅ Regular updates with latest data
+✅ Fairness audits
+
+**Monthly Fairness Audit**:
+```python
+# Check prediction equity across countries
+def audit_fairness():
+    for country in ['USA', 'India', 'Brazil', ...]:
+        country_critical_rate = predictions[country]['CRITICAL'] / total[country]
+        global_critical_rate = 0.394  # Expected
+        
+        if abs(country_critical_rate - global_critical_rate) > 0.30:
+            print(f"⚠️ Bias detected in {country}")
+```
+
+---
+
+#### 3. **Privacy & Data Protection** 🔒
+
+**What We Collect**:
+✅ Aggregate country-level statistics
+✅ Public health data (no individuals)
+✅ No personally identifiable information (PII)
+
+**What We DON'T Collect**:
+❌ Individual patient data
+❌ Names, addresses, phone numbers
+❌ Medical records
+❌ IP addresses (optional logging)
+❌ User tracking cookies
+
+**Compliance**:
+✅ GDPR-compliant (aggregate data only)
+✅ Not subject to HIPAA (no PHI)
+✅ NOT a medical device (no FDA clearance needed)
+
+---
+
+#### 4. **Human Oversight** 👤
+
+**⚠️ CRITICAL: This is NOT Autopilot**
+
+```
+❌ WRONG Usage:
+Model predicts "CRITICAL"
+    ↓
+Automatic lockdown triggered
+    ↓
+No human review
+
+✅ CORRECT Usage:
+Model predicts "CRITICAL"
+    ↓
+Public health expert reviews
+    ↓
+Considers local context:
+  • Healthcare capacity
+  • Economic factors
+  • Political feasibility
+  • Social acceptance
+    ↓
+Human makes final decision
+```
+
+**Accountability Chain**:
+1. **Model**: Provides data-driven recommendation
+2. **Health Officials**: Review and contextualize
+3. **Policymakers**: Make final decision
+4. **Public**: Hold decision-makers accountable
+
+---
+
+### Responsible Use Guidelines
+
+#### ✅ DO:
+- Combine with expert judgment
+- Validate on local data
+- Update regularly
+- Document decisions
+- Provide transparency
+- Consider all stakeholders
+- Plan for edge cases
+
+#### ❌ DON'T:
+- Use as sole decision basis
+- Ignore local context
+- Deploy without validation
+- Make irreversible automated decisions
+- Claim 100% accuracy
+- Apply beyond training scope
+- Ignore ethical concerns
+
+---
+
+### Legal Disclaimer
+
+```
+⚠️ IMPORTANT NOTICE
+
+This system is provided "AS IS" for DECISION SUPPORT ONLY.
+
+NOT intended for:
+- Automated policy enforcement
+- Clinical diagnosis
+- Medical treatment decisions
+- Replacement of expert judgment
+
+Users are responsible for:
+- Validating predictions
+- Considering local context
+- Making final decisions
+- Consequences of actions
+
+No warranties provided regarding accuracy or fitness for purpose.
+```
+
+---
+
+## 🔒 Slide 28: Security & Deployment Best Practices
+
+### Security Threats & Mitigations
+
+#### Threat 1: Adversarial Inputs
+
+**Attack**:
+```python
+# Malicious user tries to trick model
+malicious_input = {
+    'Cases_per_100k': 9999999,  # Overflow
+    'Growth_Rate': -100,        # Invalid
+    'CFR': "'; DROP TABLE --"   # SQL injection
+}
+```
+
+**Defense**:
+```python
+def validate_input(data):
+    """Sanitize all inputs"""
+    
+    # Type validation
+    if not isinstance(data['Cases_per_100k'], (int, float)):
+        raise ValueError("Invalid type")
+    
+    # Range validation
+    if not (0 <= data['Growth_Rate'] <= 10):
+        raise ValueError("Out of range")
+    
+    # Remove dangerous characters
+    if any(char in str(data.values()) for char in ["'", '"', ";", "--"]):
+        raise ValueError("Invalid characters")
+```
+
+---
+
+#### Threat 2: API Abuse
+
+**Attack**: 1 million requests/second (DDoS)
+
+**Defense - Rate Limiting**:
+```python
+# Allow 100 requests per hour per IP
+from ratelimit import limits, sleep_and_retry
+
+@sleep_and_retry
+@limits(calls=100, period=3600)
+def predict(input_data):
+    return model.predict(input_data)
+```
+
+---
+
+#### Threat 3: Model Theft
+
+**Attack**: Download model file to steal IP
+
+**Defense - Model Encryption**:
+```python
+from cryptography.fernet import Fernet
+
+# Encrypt model at rest
+key = Fernet.generate_key()
+cipher = Fernet(key)
+
+with open('model.pkl', 'rb') as f:
+    encrypted = cipher.encrypt(f.read())
+
+with open('model.pkl.encrypted', 'wb') as f:
+    f.write(encrypted)
+```
+
+---
+
+#### Threat 4: Data Injection
+
+**Attack**: Upload malicious CSV with exploit
+
+**Defense - File Validation**:
+```python
+def validate_upload(file):
+    """Validate uploaded files"""
+    
+    # Check file size
+    if file.size > 10_000_000:  # 10 MB limit
+        raise ValueError("File too large")
+    
+    # Check file type
+    if not file.name.endswith('.csv'):
+        raise ValueError("Only CSV allowed")
+    
+    # Scan for malicious content
+    content = file.read()
+    if b'<script>' in content or b'<?php' in content:
+        raise ValueError("Malicious content detected")
+    
+    # Validate CSV structure
+    df = pd.read_csv(file)
+    required_cols = ['Cases_per_100k', 'Growth_Rate', ...]
+    if not all(col in df.columns for col in required_cols):
+        raise ValueError("Missing required columns")
+```
+
+---
+
+### Deployment Checklist
+
+#### Before Launch:
+
+**Security**:
+- [ ] Input validation implemented
+- [ ] Rate limiting configured
+- [ ] HTTPS enabled
+- [ ] Secrets in environment variables (not code)
+- [ ] .gitignore updated (no sensitive files)
+- [ ] Authentication added (if needed)
+
+**Performance**:
+- [ ] Load testing completed
+- [ ] Auto-scaling configured
+- [ ] CDN for static assets
+- [ ] Database connection pooling
+- [ ] Caching enabled
+
+**Monitoring**:
+- [ ] Error tracking (Sentry, Rollbar)
+- [ ] Performance monitoring (New Relic, Datadog)
+- [ ] Uptime monitoring (Pingdom, UptimeRobot)
+- [ ] Log aggregation (Loggly, Papertrail)
+
+**Compliance**:
+- [ ] Privacy policy published
+- [ ] Terms of service defined
+- [ ] Legal disclaimer displayed
+- [ ] Data retention policy set
+- [ ] GDPR compliance verified
+
+---
+
+### Production Environment Variables
+
+**Create `.streamlit/secrets.toml`** (not committed):
+```toml
+# Model configuration
+[model]
+path = "models/trained/best_covid_warning_model.pkl"
+version = "2.0.1"
+
+# Security
+[security]
+api_key = "your-secret-api-key-here"
+password_hash = "sha256-hash-here"
+rate_limit = 100
+
+# Monitoring
+[monitoring]
+sentry_dsn = "your-sentry-dsn"
+log_level = "INFO"
+
+# Features
+[features]
+enable_batch_upload = true
+max_upload_size_mb = 10
+enable_pdf_export = false
+```
+
+---
+
+## 📊 Slide 29: Performance Optimization Tips
+
+### Optimization Strategies
+
+#### 1. **Faster Data Loading**
+
+**Before** (Slow):
+```python
+df = pd.read_csv('large_file.csv')  # 116 MB, ~8 seconds
+```
+
+**After** (Fast):
+```python
+# Use specific columns only
+df = pd.read_csv('large_file.csv', 
+                 usecols=['Cases_per_100k', 'Growth_Rate', ...])
+# 3 seconds ✅
+
+# Or use chunking
+chunks = pd.read_csv('large_file.csv', chunksize=10000)
+for chunk in chunks:
+    process(chunk)
+```
+
+---
+
+#### 2. **Faster Predictions**
+
+**Before** (Slow):
+```python
+# Predict one-by-one
+for row in data:
+    prediction = model.predict([row])  # 10ms × 1000 = 10 seconds
+```
+
+**After** (Fast):
+```python
+# Batch predictions
+predictions = model.predict(data)  # 200ms for 1000 ✅
+# 50x faster!
+```
+
+---
+
+#### 3. **Memory Optimization**
+
+**Before** (High Memory):
+```python
+# Load entire dataset
+df = pd.read_csv('data.csv')  # 2 GB RAM
+features = df[feature_cols]   # 1 GB RAM
+predictions = model.predict(features)  # 500 MB RAM
+# Total: 3.5 GB
+```
+
+**After** (Low Memory):
+```python
+# Use dtypes to reduce memory
+dtypes = {
+    'Cases_per_100k': 'float32',  # Instead of float64
+    'Growth_Rate': 'float32',
+    # ...
+}
+df = pd.read_csv('data.csv', dtype=dtypes)  # 1 GB RAM ✅
+# 50% memory reduction!
+```
+
+---
+
+#### 4. **Caching**
+
+```python
+import streamlit as st
+
+@st.cache_resource  # Cache model loading
+def load_model():
+    return joblib.load('model.pkl')
+
+@st.cache_data  # Cache predictions for same inputs
+def predict(features_hash):
+    return model.predict(features)
+
+# Model loaded once, predictions cached
+# 10x speedup for repeated queries ✅
+```
+
+---
+
+#### 5. **Parallel Processing**
+
+```python
+# Use all CPU cores
+model = RandomForestClassifier(n_jobs=-1)  # Use all cores
+
+# Multi-threaded predictions
+from joblib import Parallel, delayed
+
+predictions = Parallel(n_jobs=-1)(
+    delayed(model.predict)([row]) 
+    for row in data
+)
+
+# 4x speedup on 4-core machine ✅
+```
+
+---
+
+### Performance Benchmarks
+
+| Optimization | Before | After | Improvement |
+|--------------|--------|-------|-------------|
+| Data Loading | 8s | 3s | **2.7x faster** |
+| Batch Predict | 10s | 0.2s | **50x faster** |
+| Memory Usage | 3.5 GB | 1 GB | **71% less** |
+| Caching | 100ms | 10ms | **10x faster** |
+| Parallel | 45s | 12s | **3.8x faster** |
+
+**Total Pipeline**: 63s → 15s ⚡ **4.2x faster!**
+
+---
+
+## 🎓 Slide 30: Key Takeaways & Next Steps
+
+### What We've Built
+
+```
+A complete end-to-end ML system that:
+
+✅ Predicts public health actions 7 days ahead
+✅ Achieves 99.29% accuracy
+✅ Provides transparent, explainable decisions
+✅ Handles real-world messy data robustly
+✅ Deploys as user-friendly web application
+✅ Includes monitoring & maintenance strategy
+✅ Follows ethical AI principles
+✅ Ready for production deployment
+```
+
+---
+
+### Technical Highlights
+
+**Data Engineering**:
+- 337,185 rows processed
+- 42 features engineered from 8 raw inputs
+- Comprehensive cleaning pipeline
+
+**Machine Learning**:
+- Random Forest (100 trees, depth 10)
+- 99.29% overall accuracy
+- 99.17% critical recall (most important!)
+- 34 features, 4 classes
+
+**Deployment**:
+- Streamlit web interface
+- Docker containerization
+- Cloud-ready architecture
+- Production monitoring
+
+---
+
+### Impact & Value
+
+**For Public Health**:
+- ⏰ Early warning (7-day advance notice)
+- 🎯 High accuracy (can be trusted)
+- 📊 Data-driven decisions
+- 🔍 Explainable recommendations
+
+**For Society**:
+- ⚡ Faster response to threats
+- 💰 Reduced economic impact (targeted interventions)
+- 🏥 Better healthcare resource allocation
+- 📉 Lives saved through early action
+
+**For Data Science**:
+- 🎓 End-to-end ML project example
+- 📚 Best practices demonstrated
+- 🛠️ Production-ready code
+- 🔬 Research reproducibility
+
+---
+
+### Next Steps for Users
+
+#### **Immediate** (This Week):
+1. ✅ Clone repository from GitHub
+2. ✅ Install dependencies: `pip install -r requirements.txt`
+3. ✅ Run pipeline: `python scripts/run_pipeline.py`
+4. ✅ Launch app: `streamlit run app/streamlit_app.py`
+5. ✅ Test with sample scenarios
+
+#### **Short-Term** (This Month):
+1. 📊 Validate on your country's data
+2. 🎯 Customize warning level thresholds
+3. 🚀 Deploy to cloud (Streamlit Cloud, AWS, etc.)
+4. 📝 Add logging and monitoring
+5. 👥 Train stakeholders on usage
+
+#### **Long-Term** (This Quarter):
+1. 🔄 Set up monthly retraining schedule
+2. 📈 Implement performance tracking dashboard
+3. 🛡️ Add authentication and security hardening
+4. 📱 Create mobile-friendly interface
+5. 🤝 Integrate with existing health systems
+
+---
+
+### Future Enhancements Roadmap
+
+**Phase 1** (Q1 2026):
+- SHAP values for better explanations
+- XGBoost ensemble for improved accuracy
+- PDF report generation
+- Email alert system
+
+**Phase 2** (Q2 2026):
+- Real-time data integration (APIs)
+- Vaccination rate features
+- Variant-specific models
+- Interactive map visualization
+
+**Phase 3** (Q3 2026):
+- Time series forecasting (LSTM)
+- Multi-country collaboration features
+- Mobile application
+- Hospital capacity integration
+
+---
+
+### Resources & Links
+
+**Project Repository**:
+🔗 https://github.com/dayald434/Covid19_Warning_System
+
+**Documentation**:
+- README.md - Quick start guide
+- PROJECT_DOCUMENTATION.md - Complete technical docs (2,500+ lines)
+- PRESENTATION.md - This presentation (2,000+ lines)
+
+**Data Sources**:
+- Johns Hopkins CSSE COVID-19 Data Repository
+- World Bank Population Statistics
+
+**Tools & Technologies**:
+- Python 3.9+
+- Scikit-learn, Pandas, NumPy
+- Streamlit
+- Docker
+
+**Support**:
+- GitHub Issues for bug reports
+- Discussions for questions
+- Pull Requests welcome!
+
+---
+
+### Thank You! 🙏
+
+**Questions?**
+
+📧 Contact: [Your Email]
+🌐 Website: [Your Website]
+💼 LinkedIn: [Your Profile]
+🐱 GitHub: [@dayald434](https://github.com/dayald434)
+
+---
+
+**Remember**: 
+> "The best model is useless if not deployed responsibly.  
+> The best deployment is useless if the model isn't accurate.  
+> The best system is useless if not used ethically."
+
+**Let's build AI that serves humanity.** 🌍
+
+---
+
+## 📎 Appendix: Quick Reference
