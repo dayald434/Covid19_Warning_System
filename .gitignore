@@ -25,13 +25,22 @@ ENV/
 env/
 
 # Data files
+# Allow key project datasets to be versioned for deployment
 data/raw/*
-!data/raw/.gitkeep
+!data/raw/time_series_covid19_confirmed_global.csv
+!data/raw/time_series_covid19_deaths_global.csv
+!data/raw/time_series_covid19_recovered_global.csv
+
 *.csv
+!data/raw/time_series_covid19_confirmed_global.csv
+!data/raw/time_series_covid19_deaths_global.csv
+!data/raw/time_series_covid19_recovered_global.csv
+!models/trained/per_class_performance.csv
 !tests/test_data/*.csv
 
-# Model files (large)
-models/trained/*.pkl
+# Model files (for inference in deployments)
+# (These are small enough to track in Git for this project.)
+# models/trained/*.pkl  # previously ignored
 
 # IDEs
 .vscode/
