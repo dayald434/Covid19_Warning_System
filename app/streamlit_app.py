@@ -77,8 +77,8 @@ def main():
         st.markdown("---")
         st.subheader("Performance:")
         st.markdown("""
-        - Accuracy: 75-85%
-        - Critical Recall: 80-95%
+        - Accuracy: 75-85 percent
+        - Critical Recall: 80-95 percent
         """)
     
     # Main content
@@ -107,13 +107,13 @@ def page_prediction(model, feature_columns):
     
     with col1:
         st.subheader("Growth Dynamics")
-        user_input['Growth_Rate'] = st.slider("Growth Rate (%/day)", -1.0, 2.0, 0.10, 0.01,
+        user_input['Growth_Rate'] = st.slider("Growth Rate (percent per day)", -1.0, 2.0, 0.10, 0.01,
                                                help="📈 Percentage change in daily cases")
         user_input['Doubling_Time'] = st.number_input("Doubling Time (days)", 1.0, 1000.0, 60.0, 1.0,
                                                        help="📊 Days for cases to double")
         user_input['Acceleration'] = st.slider("Acceleration (/day)", -1.0, 1.0, 0.0, 0.01,
                                                 help="🚀 Rate of change in growth speed")
-        user_input['Death_Growth'] = st.slider("Death Growth Rate (%/day)", -1.0, 2.0, 0.02, 0.01,
+        user_input['Death_Growth'] = st.slider("Death Growth Rate (percent per day)", -1.0, 2.0, 0.02, 0.01,
                                                 help="📉 Daily percentage change in deaths")
         
         st.subheader("7-Day Averages")
@@ -155,8 +155,8 @@ def page_prediction(model, feature_columns):
         user_input['IsWeekend'] = 1 if user_input['IsWeekend'] == 'Yes' else 0
         
         st.subheader("Severity Indicators")
-        user_input['CFR'] = st.slider("Case Fatality Rate (%)", 0.0, 15.0, 1.0, 0.1,
-                                       help="⚰️ Deaths ÷ Cases × 100")
+        user_input['CFR'] = st.slider("Case Fatality Rate (percent)", 0.0, 15.0, 1.0, 0.1,
+                                       help="⚰️ Deaths / Cases * 100")
         user_input['Active_Cases'] = st.number_input("Active Cases", 0, 10000000, 100000, 1000,
                                                       help="📊 Current active cases")
     
@@ -379,11 +379,11 @@ def page_prediction(model, feature_columns):
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                st.metric("Growth Rate", f"{input_data['Growth_Rate']:.2%}")
+                st.metric("Growth Rate", f"{input_data['Growth_Rate']*100:.2f}%")
             with col2:
                 st.metric("Cases per 100k", f"{input_data['Cases_per_100k']:.1f}")
             with col3:
-                st.metric("CFR", f"{input_data['CFR']:.1f}%")
+                st.metric("CFR (percent)", f"{input_data['CFR']:.1f}")
             with col4:
                 st.metric("Deaths per 100k", f"{input_data['Deaths_per_100k']:.1f}")
             
@@ -400,7 +400,7 @@ def page_prediction(model, feature_columns):
                 
                 **Prediction horizon:** 7 days ahead
                 
-                **Confidence level:** Higher confidence (>80%) indicates the model is very certain about the prediction based on historical patterns.
+                **Confidence level:** Higher confidence (greater than 80 percent) indicates the model is very certain about the prediction based on historical patterns.
                 
                 **Important:** This is a decision support tool. Always combine with expert epidemiological judgment and local context.
                 """)
@@ -512,10 +512,10 @@ def page_about():
     ### Risk Scoring System
     
     The system calculates a composite risk score based on:
-    - **Growth Rate (40%)**: Speed of case increase
-    - **Case Burden (30%)**: Cases per 100,000 population
-    - **Doubling Time (20%)**: How fast cases double
-    - **Case Fatality Rate (10%)**: Disease severity
+    - **Growth Rate (40 percent)**: Speed of case increase
+    - **Case Burden (30 percent)**: Cases per 100,000 population
+    - **Doubling Time (20 percent)**: How fast cases double
+    - **Case Fatality Rate (10 percent)**: Disease severity
     
     ### Warning Levels
     
@@ -529,12 +529,12 @@ def page_about():
     ### Model Performance
     
     - **Dataset**: 337,185 total records → 10,071 valid samples (2020-2023)
-    - **Training**: 8,066 samples (80% split)
-    - **Testing**: 2,005 samples (20% split)
+    - **Training**: 8,066 samples (80 percent split)
+    - **Testing**: 2,005 samples (20 percent split)
     - **Countries**: 201 countries and regions
     - **Algorithm**: Random Forest (100 trees)
     - **Optimization**: Focused on detecting critical situations
-    - **Critical Recall**: 91.7% (detects 92% of critical situations)
+    - **Critical Recall**: 91.7 percent (detects 92 percent of critical situations)
     
     ### Data Sources
     
