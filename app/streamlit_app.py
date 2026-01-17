@@ -295,7 +295,7 @@ def page_prediction(model, feature_columns):
                     "😷 Mandatory mask mandates in public spaces",
                     "👥 Limit large gatherings (max 10-20 people)",
                     "🏢 Encourage work-from-home policies",
-                    "🧪 Increase testing capacity by 50%"
+                    "🧪 Increase testing capacity by 50 percent"
                 ]
             elif 'MODERATE' in prediction.upper():
                 actions = [
@@ -321,7 +321,7 @@ def page_prediction(model, feature_columns):
                 # Show exact prediction label
                 st.markdown(f"### {color} {prediction}")
                 if confidence:
-                    st.metric("Model Confidence", f"{confidence:.1%}")
+                    st.metric("Model Confidence", f"{confidence*100:.1f}%")
                     
                     # Confidence interpretation
                     if confidence >= 0.8:
@@ -371,7 +371,7 @@ def page_prediction(model, feature_columns):
                     with col_a:
                         st.progress(prob, text=f"{level_color} {level}")
                     with col_b:
-                        st.markdown(f"**{prob:.1%}**")
+                        st.markdown(f"**{prob*100:.1f}%**")
             
             # Key metrics summary
             st.markdown("---")
@@ -396,7 +396,7 @@ def page_prediction(model, feature_columns):
                 - Analyzes 34 epidemiological features from current data
                 - Predicts intervention level needed 7 days from now
                 - Trained on 8,066 samples from 337,185+ historical COVID-19 records
-                - Optimized to detect critical situations early (91.7% Critical Recall)
+                - Optimized to detect critical situations early (91.7 percent Critical Recall)
                 
                 **Prediction horizon:** 7 days ahead
                 
