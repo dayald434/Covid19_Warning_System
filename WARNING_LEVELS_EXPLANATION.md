@@ -6,6 +6,52 @@ This document explains the **4-tier warning level classification system** implem
 
 ---
 
+## Quick Reference Guide for Presentation
+
+### The 4 Warning Levels - At a Glance
+
+| Level | Icon | Risk Score | Growth Rate | Cases/100k | Key Action | Model Accuracy |
+|-------|------|------------|-------------|------------|------------|----------------|
+| **CRITICAL_LOCKDOWN** | 🔴 | 10-13 pts | >20%/day | >1,000 | Full lockdown, emergency measures | 99.51% F1 |
+| **HIGH_RESTRICTIONS** | 🟠 | 6-9 pts | 10-20%/day | 500-1,000 | Partial lockdown, capacity limits | 99.29% F1 |
+| **MODERATE_MEASURES** | 🟡 | 3-5 pts | 5-10%/day | 200-500 | Masks, distancing, testing | 98.25% F1 |
+| **LOW_MONITORING** | 🟢 | 0-2 pts | <5%/day | <200 | Surveillance, preparedness | 95.98% F1 |
+
+### How It Works - Simple Explanation
+
+**For Your Professor:**
+
+**Phase 1: Creating Training Labels (Weighted Sum Model)**
+1. Take historical data with known future outcomes
+2. Apply WSM to calculate risk scores: Growth Rate (40%) + Disease Burden (30%) + Doubling Time (20%) + CFR (10%)
+3. Classify risk scores into 4 warning levels
+4. This creates the **target variable** for machine learning
+
+**Phase 2: Machine Learning Prediction (Random Forest)**
+5. **Input**: Current COVID-19 metrics (34 features)
+6. **Model**: Random Forest Classifier learns patterns from 51,896 historical examples
+7. **Output**: Predicts which warning level will be needed **7 days ahead**
+8. **Accuracy**: 99.29% on unseen test data
+
+**In Simple Terms**: WSM labels the training data, Random Forest learns to predict those labels
+
+### Why This Matters
+
+- **Proactive not Reactive**: Gives policymakers 7 days to prepare
+- **Objective**: Removes subjective decision-making bias
+- **Standardized**: Same criteria worldwide for fair comparison
+- **Validated**: 99%+ accuracy on 3+ years of global COVID-19 data (201 countries)
+
+### Real Example to Share
+
+**March 1, 2020 - Country X**:
+- Current: 500 daily cases, seems manageable
+- Model predicts: HIGH_RESTRICTIONS needed by March 8
+- Result: Government has 7 days to prepare hospital capacity
+- Outcome: Healthcare system ready when surge hits
+
+---
+
 ## Table of Contents
 
 1. [Purpose and Motivation](#purpose-and-motivation)
