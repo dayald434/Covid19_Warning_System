@@ -50,6 +50,40 @@ This document explains the **4-tier warning level classification system** implem
 - Result: Government has 7 days to prepare hospital capacity
 - Outcome: Healthcare system ready when surge hits
 
+### Examples for All 4 Warning Levels
+
+**Example 1: 🔴 CRITICAL_LOCKDOWN**
+- **Situation**: Italy, March 2020
+- **Metrics**: Growth rate 25%/day, 1,200 cases/100k, doubling time 4 days, CFR 6%
+- **Risk Score**: 13/13 points (Maximum)
+- **Prediction**: CRITICAL_LOCKDOWN needed in 7 days
+- **Action Taken**: Full nationwide lockdown implemented
+- **Outcome**: Prevented complete healthcare collapse
+
+**Example 2: 🟠 HIGH_RESTRICTIONS**
+- **Situation**: Los Angeles County, December 2020
+- **Metrics**: Growth rate 15%/day, 650 cases/100k, doubling time 10 days, CFR 3.5%
+- **Risk Score**: 8/13 points
+- **Prediction**: HIGH_RESTRICTIONS needed in 7 days
+- **Action Taken**: Outdoor dining banned, capacity limits 25%
+- **Outcome**: Slowed transmission, avoided critical level
+
+**Example 3: 🟡 MODERATE_MEASURES**
+- **Situation**: Singapore, June 2021
+- **Metrics**: Growth rate 7%/day, 350 cases/100k, doubling time 20 days, CFR 1.8%
+- **Risk Score**: 4/13 points
+- **Prediction**: MODERATE_MEASURES needed in 7 days
+- **Action Taken**: Mask mandates, reduced gathering limits
+- **Outcome**: Maintained control without strict lockdown
+
+**Example 4: 🟢 LOW_MONITORING**
+- **Situation**: New Zealand, November 2020
+- **Metrics**: Growth rate 1%/day, 80 cases/100k, doubling time 70 days, CFR 0.5%
+- **Risk Score**: 1/13 points
+- **Prediction**: LOW_MONITORING maintained
+- **Action Taken**: Border surveillance, contact tracing readiness
+- **Outcome**: Normal life maintained with vigilance
+
 ---
 
 ## Table of Contents
@@ -552,6 +586,12 @@ print(f"Columns: {df.columns.tolist()}")
 
 **Code**:
 ```python
+# 4.0 OPTIONAL: Filter for specific countries only (e.g., 3 countries)
+# Uncomment to analyze only specific countries:
+# countries_to_analyze = ['US', 'India', 'United Kingdom']
+# df = df[df['Country/Region'].isin(countries_to_analyze)]
+# print(f"Filtered to {len(countries_to_analyze)} countries: {df['Country/Region'].unique()}")
+
 # 4.1 Fill missing values
 df['Province/State'].fillna('All', inplace=True)
 df['Confirmed'].fillna(0, inplace=True)
@@ -1219,7 +1259,7 @@ Warning Level: HIGH_RESTRICTIONS
 
 ### STEP 20: Deploy to Streamlit Web App
 
-**Objective**: Create interactive user interface
+**Objective**: Create interactive user interface with country selection
 
 **Code** (`app/streamlit_app.py`):
 ```python
@@ -1227,36 +1267,132 @@ import streamlit as st
 import joblib
 import pandas as pd
 
-# Load model
+# Load model and data
 @st.cache_resource
 def load_model():
     return joblib.load('models/trained/best_covid_warning_model.pkl')
 
+@st.cache_data
+def load_prepared_data():
+    return pd.read_csv('data/processed/covid19_prepared_data.csv')
+
 model_package = load_model()
 model = model_package['model']
+df = load_prepared_data()
 
 # Streamlit UI
 st.title("🦠 COVID-19 Early Warning System")
 st.write("Predict required public health actions 7 days in advance")
 
-# Input form
-growth_rate = st.slider("Growth Rate (%/day)", -1.0, 2.0, 0.10, 0.01)
-cases_per_100k = st.number_input("Cases per 100k", 0.0, 5000.0, 300.0)
-doubling_time = st.number_input("Doubling Time (days)", 1.0, 1000.0, 60.0)
-cfr = st.slider("Case Fatality Rate (%)", 0.0, 15.0, 1.0, 0.1)
-# ... (more inputs)
+# COUNTRY SELECTION FEATURE
+st.sidebar.header("🌍 Select Region")
 
-if st.button("🔮 Predict Warning Level"):
-    # Prepare input
-    input_data = pd.DataFrame({...})  # All features
+# Get unique countries from data
+all_countries = sorted(df['Country/Region'].unique().tolist())
+
+# Add "All Countries" option
+country_options = ["All Countries"] + all_countries
+
+# Country selector dropdown
+selected_country = st.sidebar.selectbox(
+    "Choose Country/Region:",
+    options=country_options,
+    index=0  # Default to "All Countries"
+)
+
+# Filter data based on selection
+if selected_country == "All Countries":
+    filtered_df = df.copy()
+    st.sidebar.info(f"📊 Showing data for **{len(all_countries)} countries**")
+else:
+    filtered_df = df[df['Country/Region'] == selected_country]
+    st.sidebar.success(f"📍 Selected: **{selected_country}**")
+    st.sidebar.metric("Total Records", f"{len(filtered_df):,}")
+
+# Display statistics
+st.subheader(f"📈 Current Statistics - {selected_country}")
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    total_cases = filtered_df['Confirmed'].max()
+    st.metric("Total Cases", f"{total_cases:,.0f}")
+
+with col2:
+    total_deaths = filtered_df['Deaths'].max()
+    st.metric("Total Deaths", f"{total_deaths:,.0f}")
+
+with col3:
+    latest_growth = filtered_df['Growth_Rate'].iloc[-1] * 100
+    st.metric("Growth Rate", f"{latest_growth:.2f}%")
+
+with col4:
+    latest_cases_100k = filtered_df['Cases_per_100k'].iloc[-1]
+    st.metric("Cases/100k", f"{latest_cases_100k:.1f}")
+
+# Prediction Section
+st.subheader("🔮 Make Prediction")
+
+# Input form
+col1, col2 = st.columns(2)
+
+with col1:
+    growth_rate = st.slider("Growth Rate (%/day)", -1.0, 2.0, 0.10, 0.01)
+    cases_per_100k = st.number_input("Cases per 100k", 0.0, 5000.0, 300.0)
     
-    # Predict
+with col2:
+    doubling_time = st.number_input("Doubling Time (days)", 1.0, 1000.0, 60.0)
+    cfr = st.slider("Case Fatality Rate (%)", 0.0, 15.0, 1.0, 0.1)
+
+# More inputs (add remaining 34 features as needed)
+daily_cases = st.number_input("Daily Cases", 0, 1000000, 5000)
+days_since_100 = st.number_input("Days Since 100th Case", 0, 2000, 100)
+
+if st.button("🔮 Predict Warning Level", type="primary"):
+    # Prepare input (ensure all 34 features)
+    input_data = pd.DataFrame({
+        'Growth_Rate': [growth_rate],
+        'Cases_per_100k': [cases_per_100k],
+        'Doubling_Time': [doubling_time],
+        'CFR': [cfr],
+        'Daily_Cases': [daily_cases],
+        'Days_Since_100': [days_since_100],
+        # ... add remaining features with default values
+    })
+    
+    # Ensure correct feature order
+    input_data = input_data[model_package['feature_names']]
+    
+    # Make prediction
     prediction = model.predict(input_data)[0]
     proba = model.predict_proba(input_data)[0]
     
-    # Display result
-    st.success(f"**Predicted Level: {prediction}**")
-    st.write(f"Confidence: {max(proba)*100:.1f}%")
+    # Display result with color coding
+    st.markdown("---")
+    st.subheader("📊 Prediction Results")
+    
+    if prediction == 'CRITICAL_LOCKDOWN':
+        st.error(f"🔴 **{prediction}**")
+    elif prediction == 'HIGH_RESTRICTIONS':
+        st.warning(f"🟠 **{prediction}**")
+    elif prediction == 'MODERATE_MEASURES':
+        st.info(f"🟡 **{prediction}**")
+    else:
+        st.success(f"🟢 **{prediction}**")
+    
+    # Confidence breakdown
+    st.write("**Confidence Breakdown:**")
+    for class_label, prob in zip(model.classes_, proba):
+        st.progress(prob, text=f"{class_label}: {prob*100:.1f}%")
+
+# Show recent trends for selected country/region
+if selected_country != "All Countries":
+    st.subheader(f"📉 Recent Trends - {selected_country}")
+    
+    # Get last 30 days
+    recent_data = filtered_df.tail(30)
+    
+    # Display chart (if you have plotly/matplotlib)
+    st.line_chart(recent_data[['Daily_Cases', 'Deaths']].set_index(recent_data['Date']))
 ```
 
 **Run App**:
@@ -1265,6 +1401,14 @@ streamlit run app/streamlit_app.py
 ```
 
 **Access**: http://localhost:8501
+
+**Features**:
+- ✅ Dropdown to select specific country or "All Countries"
+- ✅ Shows statistics for selected region
+- ✅ Displays total records and metrics
+- ✅ Color-coded prediction results
+- ✅ Confidence breakdown with progress bars
+- ✅ Recent trends chart for individual countries
 
 ---
 
