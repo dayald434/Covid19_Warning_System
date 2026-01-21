@@ -77,12 +77,12 @@ A **Machine Learning System** that analyzes current COVID-19 trends and predicts
 
 ### The 4 Warning Levels
 
-| Level | Color | Meaning | Example Actions |
-|-------|-------|---------|----------------|
-| 🔴 **CRITICAL_LOCKDOWN** | Red | Emergency intervention needed | Full lockdown, close businesses |
-| 🟠 **HIGH_RESTRICTIONS** | Orange | Strong measures required | Capacity limits, remote work |
-| 🟡 **MODERATE_MEASURES** | Yellow | Enhanced precautions | Masks, social distancing |
-| 🟢 **LOW_MONITORING** | Green | Standard surveillance | Continue monitoring |
+| Level | Color | Meaning | Example Actions | Real-World Example |
+|-------|-------|---------|----------------|-------------------|
+| 🔴 **CRITICAL_LOCKDOWN** | Red | Emergency intervention needed | Full lockdown, close businesses | Italy, March 2020 (25% growth, 1,200/100k) |
+| 🟠 **HIGH_RESTRICTIONS** | Orange | Strong measures required | Capacity limits, remote work | Los Angeles, Dec 2020 (15% growth, 650/100k) |
+| 🟡 **MODERATE_MEASURES** | Yellow | Enhanced precautions | Masks, social distancing | Singapore, June 2021 (7% growth, 350/100k) |
+| 🟢 **LOW_MONITORING** | Green | Standard surveillance | Continue monitoring | New Zealand, Nov 2020 (1% growth, 80/100k) |
 
 ### Why 7 Days?
 
@@ -804,6 +804,151 @@ Confidence: 87%
 
 ---
 
+## 🎯 Slide 8.5: Two-Phase Architecture - WSM + Random Forest
+
+### The Critical Question: Why Use BOTH Algorithms?
+
+**The Problem We Faced:**
+```
+Historical COVID-19 Data (2020-2023):
+Date        Country   Cases   Deaths   Growth_Rate   Warning_Level
+2020-03-15  Italy     5,000   500      25%           ❓ UNKNOWN
+2020-06-10  Germany   800     20       3%            ❓ UNKNOWN
+```
+
+❌ **No government labeled their data as "CRITICAL" or "MODERATE"**
+❌ **Random Forest needs labeled data to learn**
+❌ **We can't train a model without knowing what to predict**
+
+---
+
+### Our Solution: Two-Phase System
+
+#### **Phase 1: WSM Creates Training Labels** (Automatic Labeling)
+
+**Input:** Historical data + future metrics (shift -7 days)
+**Output:** Warning_Level_7d_Ahead labels for all 51,896 records
+
+```python
+# For each historical date, WSM looks 7 days into the future
+def label_historical_data(df):
+    for each_row in df:
+        # Get what ACTUALLY happened 7 days later
+        future_growth = row['Growth_Rate'] shifted -7 days
+        future_cases = row['Cases_per_100k'] shifted -7 days
+        future_doubling = row['Doubling_Time'] shifted -7 days
+        future_cfr = row['CFR'] shifted -7 days
+        
+        # Calculate risk score from KNOWN future outcomes
+        risk_score = calculate_wsm_score(
+            future_growth, future_cases, 
+            future_doubling, future_cfr
+        )
+        
+        # Assign label based on what was needed
+        row['Warning_Level_7d_Ahead'] = classify(risk_score)
+    
+    return labeled_df  # Now we have training labels!
+```
+
+**Result:**
+```
+Date        Country   Cases   Deaths   Growth_Rate   Warning_Level_7d_Ahead
+2020-03-15  Italy     5,000   500      25%           🔴 CRITICAL (WSM assigned)
+2020-06-10  Germany   800     20       3%            🟡 MODERATE (WSM assigned)
+2021-01-05  USA       12,000  1,200    18%           🟠 HIGH (WSM assigned)
+```
+
+---
+
+#### **Phase 2: Random Forest Learns Patterns** (Machine Learning)
+
+**Input:** Current metrics + WSM-created labels
+**Output:** Prediction model that can forecast future warning levels
+
+```python
+# Random Forest learns from WSM labels
+X = df[['Growth_Rate', 'Cases_per_100k', 'Doubling_Time', 
+        'CFR', 'Deaths_7d_MA', 'Daily_Cases', ... (34 features)]]
+y = df['Warning_Level_7d_Ahead']  # Labels created by WSM
+
+# Train the model
+rf_model = RandomForestClassifier(n_estimators=100, max_depth=10)
+rf_model.fit(X, y)  # Learns: "What patterns lead to CRITICAL?"
+
+# Now can predict for NEW data (where we don't know the future)
+prediction = rf_model.predict(current_data)
+```
+
+**What Random Forest Learns:**
+```
+Pattern Example:
+IF Growth_Rate > 15% 
+   AND Cases_7d_MA increasing 
+   AND DayOfWeek = Monday (weekend lag effect)
+   AND Days_Since_100 < 50 (early outbreak)
+THEN predict CRITICAL (confidence: 98%)
+```
+
+---
+
+### Why This Two-Phase Approach Works
+
+| Aspect | WSM (Phase 1) | Random Forest (Phase 2) |
+|--------|---------------|------------------------|
+| **Purpose** | Create training labels | Learn to predict labels |
+| **Input** | Future metrics (known in training) | Current metrics (available in production) |
+| **Features Used** | 4 key metrics (Growth, Cases/100k, Doubling, CFR) | ALL 34 features |
+| **Strength** | Expert knowledge, explainable | Pattern recognition, accuracy |
+| **Limitation** | Simple rules, uses only 4 features | Needs labeled data (WSM provides this!) |
+| **Role** | Teacher (labels historical data) | Student (learns from labels) |
+
+---
+
+### Real-World Analogy
+
+**Spam Email Filter:**
+```
+Phase 1 (WSM): You manually mark emails as spam/not spam
+              → Creates labeled training dataset
+
+Phase 2 (RF): Email filter learns from your labels
+              → Can now automatically classify new emails
+```
+
+**Our System:**
+```
+Phase 1 (WSM): Algorithm labels historical COVID data by looking at
+              what intervention was needed based on future outcomes
+              → Creates labeled training dataset
+
+Phase 2 (RF): Model learns patterns from 34 features that predict
+              those labels using only current data
+              → Can now predict future warning levels
+```
+
+---
+
+### Why We Can't Skip Either Phase
+
+❌ **Without WSM:**
+- No labels to train Random Forest
+- Can't learn what "CRITICAL" vs "MODERATE" means
+- Would need 51,896 manual labels from experts (impossible!)
+
+❌ **Without Random Forest:**
+- Stuck with simple 4-metric WSM rules
+- Can't leverage 34 features
+- Miss complex patterns (weekend effects, outbreak maturity, etc.)
+- Lower accuracy (~75% vs 99.29%)
+
+✅ **With Both:**
+- WSM provides consistent, expert-based labels
+- Random Forest achieves 99.29% accuracy using all available information
+- Best of both worlds: explainable foundation + powerful prediction
+
+---
+
 ## 🤖 Slide 9: Machine Learning Model - Deep Dive
 
 ### Algorithm Selection
@@ -1251,9 +1396,40 @@ We built an **interactive web application** for easy use:
 🌐 Access: http://localhost:8501
 ```
 
-### 4 Main Features
+### 5 Main Features
 
-#### 1️⃣ **Single Prediction Mode**
+#### 1️⃣ **Country Selector** 🌍 (NEW!)
+```
+┌────────────────────────────────────────┐
+│  🌍 Select Region                      │
+│  ┌──────────────────────────────────┐ │
+│  │ ▼ All Countries                  │ │
+│  │   All Countries                  │ │
+│  │   Afghanistan                    │ │
+│  │   Albania                        │ │
+│  │   ...                            │ │
+│  │   Germany                        │ │
+│  │   ...                            │ │
+│  │   United States                  │ │
+│  │   ...                            │ │
+│  │   (201 countries total)          │ │
+│  └──────────────────────────────────┘ │
+└────────────────────────────────────────┘
+```
+
+**Benefits:**
+- ✅ **Targeted Analysis:** Focus on specific countries
+- ✅ **Comparative Studies:** Switch between countries instantly
+- ✅ **Regional Focus:** Filter for your jurisdiction
+- ✅ **Flexible Use:** "All Countries" for global view OR single country
+- ✅ **Better UX:** No information overload
+- ✅ **Deployment-Ready:** Practical for real health departments
+
+**Use Case:** Country-specific monitoring or multi-country comparison
+
+---
+
+#### 2️⃣ **Single Prediction Mode**
 ```
 ┌────────────────────────────────────────┐
 │  Enter Current Situation:              │
@@ -1264,12 +1440,22 @@ We built an **interactive web application** for easy use:
 │                                        │
 │  [Predict] ──────→  ⚠️ HIGH_RESTRICTIONS │
 │                     (92% confidence)   │
+│                                        │
+│  📍 Real-World Example:                │
+│  Los Angeles, Dec 2020                 │
+│  Growth: 15%/day, Cases: 650/100k      │
+│  → Partial lockdown prevented collapse │
 └────────────────────────────────────────┘
 ```
 
+**Features:**
+- Real-world examples for all 4 warning levels
+- Interactive input sliders and number fields
+- Instant predictions with confidence scores
+
 **Use Case:** Quick scenario analysis
 
-#### 2️⃣ **Batch Upload**
+#### 3️⃣ **Batch Upload**
 ```
 ┌────────────────────────────────────────┐
 │  Upload CSV with 100 provinces         │
@@ -1282,7 +1468,7 @@ We built an **interactive web application** for easy use:
 
 **Use Case:** National-level analysis
 
-#### 3️⃣ **Test Scenarios**
+#### 4️⃣ **Test Scenarios**
 ```
 Pre-loaded realistic scenarios:
 ✓ Critical Lockdown Test
@@ -1293,7 +1479,7 @@ Pre-loaded realistic scenarios:
 
 **Use Case:** Understand model behavior
 
-#### 4️⃣ **Feature Importance Visualization**
+#### 5️⃣ **Feature Importance Visualization**
 ```
 Interactive charts showing:
 - Which features matter most
@@ -1302,6 +1488,106 @@ Interactive charts showing:
 ```
 
 **Use Case:** Transparency and trust
+
+---
+
+### 📋 Data Input Requirements - What Users Need to Provide
+
+**Quick Answer:** Just **TODAY's data** (one snapshot), not 7 separate days!
+
+#### What You Enter (16 manual inputs):
+
+| Field | What It Is | Example | Where to Get It |
+|-------|-----------|---------|----------------|
+| **Cases 7-Day MA** | 7-day moving average of cases | 4,800 | WHO/CDC daily report (already calculated) |
+| **Deaths 7-Day MA** | 7-day moving average of deaths | 45 | WHO/CDC daily report (already calculated) |
+| **Growth Rate** | Current daily growth percentage | 5.2% | Health department report |
+| **Daily Cases** | New cases today | 5,000 | Official daily bulletin |
+| **Daily Deaths** | New deaths today | 50 | Official daily bulletin |
+| **Deaths per 100k** | Cumulative deaths normalized | 120 | Public health dashboard |
+| **Cases per 100k** | Current cases normalized | 850 | Public health dashboard |
+| **Doubling Time** | Days to double | 60 | Calculated or reported |
+| **CFR** | Case Fatality Rate | 1.0% | Reported (Deaths/Cases × 100) |
+| **Active Cases** | Current active | 100,000 | Dashboard |
+| **Days Since 100 Cases** | Calendar days since milestone | 1,787 | Historical record |
+| **Days Since Start** | Calendar days since first case | 2,186 | Historical record |
+| **Day of Week** | Today's day | Wednesday | Calendar |
+| **Acceleration** | Growth change rate | 0.05 | Calculated or estimated |
+| **Death Growth** | Mortality trend | 2% | Calculated |
+
+---
+
+#### Common Confusion Clarified:
+
+**❓ "Do I need 7 days of data for the 7-day averages?"**
+✅ **NO!** You only enter ONE number (the average), not 7 separate days.
+
+**Example:**
+```
+❌ Wrong: Enter data for Jan 15, 16, 17, 18, 19, 20, 21
+✅ Right: Enter "Cases 7-Day MA: 4,800" from today's report
+```
+
+**Where the "4,800" comes from:**
+- WHO/CDC/Johns Hopkins calculate this for you daily
+- They report: "Today's 7-day average: 4,800 cases/day"
+- You just copy that number
+
+---
+
+#### Timeline Example (January 21, 2026):
+
+```
+              PAST 7 DAYS                    TODAY             PREDICTION
+        ┌────────────────────┐                 │                   │
+Jan 14  Jan 15  ...  Jan 20  Jan 21           Jan 21            Jan 28
+ 4,200  3,800  ...   5,000   5,100              │                 │
+        └──────┬──────┘                         │                 │
+               ↓                                │                 │
+        Average = 4,800 ←──────────────────────┤                 │
+        (pre-calculated)                        │                 │
+                                                │                 │
+You enter: Cases 7-Day MA = 4,800              │                 │
+(This ONE number)                               │                 │
+                                                ↓                 ↓
+                                          Model uses         Predicts warning
+                                          TODAY's data       level for 7 days
+                                          to predict  ────→  ahead (Jan 28)
+```
+
+---
+
+#### What "Days Since 100 Cases" Means:
+
+**Definition:** Number of days from when the country first reached 100 total cases until TODAY
+
+**Example for Germany:**
+```
+March 1, 2020: Germany reaches 100 cases (HISTORICAL MILESTONE)
+     ↓
+January 21, 2026: TODAY
+     ↓
+Days elapsed: 1,787 days ← This is what you enter
+```
+
+**Key Points:**
+- ✅ This is a TIME counter (calendar days), not a case counter
+- ✅ It NEVER decreases (always counts up from the historical date)
+- ✅ Even if cases drop to zero, this number keeps increasing
+- ✅ Purpose: Shows outbreak maturity (early=50 days, late=1,800 days)
+
+**Why 100?** International standard for "outbreak officially started" - filters out initial sporadic cases.
+
+---
+
+#### Data Input Summary:
+
+| What You Need | What You DON'T Need |
+|---------------|---------------------|
+| ✅ Today's single snapshot | ❌ Multiple days of historical data |
+| ✅ Pre-calculated 7-day averages (from reports) | ❌ Raw daily numbers to calculate averages yourself |
+| ✅ One form submission | ❌ Seven separate form submissions |
+| ✅ Current metrics from official sources | ❌ Future projections (model does this) |
 
 ---
 
