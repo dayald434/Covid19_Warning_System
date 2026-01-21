@@ -34,6 +34,18 @@ def load_model():
         st.error(f"Error loading model: {e}")
         return None
 
+# Load prepared data
+@st.cache_data
+def load_prepared_data():
+    """Load the prepared dataset for country selection"""
+    try:
+        data_path = Path(__file__).parent.parent / 'data' / 'processed' / 'covid19_prepared_data.csv'
+        df = pd.read_csv(data_path)
+        return df
+    except Exception as e:
+        st.warning(f"Dataset not found. Country selector disabled.")
+        return None
+
 # Main app
 def main():
     # Load model
@@ -49,6 +61,25 @@ def main():
     
     # Sidebar
     with st.sidebar:
+        # COUNTRY SELECTOR AT TOP
+        df = load_prepared_data()
+        if df is not None:
+            st.header("🌍 Select Region")
+            
+            # Get unique countries
+            all_countries = sorted(df['Country/Region'].unique().tolist())
+            country_options = ["All Countries"] + all_countries
+            
+            # Country selector
+            selected_country = st.selectbox(
+                "Choose Country/Region:",
+                options=country_options,
+                index=0,
+                help="Select a specific country or view all countries"
+            )
+            
+            st.markdown("---")
+        
         st.title("Navigation")
         page = st.radio("Select Page", ["🔮 Prediction", "📊 Batch", "ℹ️ About"], label_visibility="collapsed")
         
