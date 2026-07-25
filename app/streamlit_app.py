@@ -9,6 +9,22 @@ import numpy as np
 import joblib
 from pathlib import Path
 import warnings
+from pandas.errors import EmptyDataError
+
+FALLBACK_COUNTRIES = [
+    'United States', 'India', 'Brazil', 'Russia', 'United Kingdom', 'France',
+    'Turkey', 'Italy', 'Germany', 'Spain', 'Argentina', 'Colombia', 'Mexico',
+    'Poland', 'Iran', 'Ukraine', 'Peru', 'South Africa', 'Netherlands', 'Iraq',
+    'Indonesia', 'Philippines', 'Bangladesh', 'Japan', 'Pakistan', 'Nigeria',
+    'Ethiopia', 'Egypt', 'Vietnam', 'Thailand', 'Myanmar', 'Kenya', 'Canada',
+    'Morocco', 'Saudi Arabia', 'Malaysia', 'Australia', 'Sri Lanka', 'Romania',
+    'Chile', 'Ecuador', 'Guatemala', 'Belgium', 'Bolivia', 'Cuba', 'Portugal',
+    'Sweden', 'Hungary', 'Austria', 'Switzerland', 'Denmark', 'Finland',
+    'Norway', 'Ireland', 'New Zealand', 'Panama', 'Kuwait', 'Croatia', 'Georgia',
+    'Uruguay', 'Lithuania', 'Slovenia', 'Latvia', 'Estonia', 'Cyprus', 'Luxembourg',
+    'Malta', 'Iceland', 'Israel', 'Singapore', 'Czechia', 'Greece', 'Serbia',
+    'Bahrain', 'Qatar', 'Albania', 'Armenia', 'Bosnia and Herzegovina', 'Mongolia'
+]
 
 # Suppress sklearn feature name warnings (model was trained without feature names)
 warnings.filterwarnings('ignore', message='X has feature names')
@@ -38,13 +54,27 @@ def load_model():
 @st.cache_data
 def load_prepared_data():
     """Load the prepared dataset for country selection"""
+    data_path = Path(__file__).parent.parent / 'data' / 'processed' / 'covid19_prepared_data.csv'
+    raw_confirmed_path = Path(__file__).parent.parent / 'data' / 'raw' / 'time_series_covid19_confirmed_global.csv'
     try:
-        data_path = Path(__file__).parent.parent / 'data' / 'processed' / 'covid19_prepared_data.csv'
+        if not data_path.exists() or data_path.stat().st_size == 0:
+            raise FileNotFoundError(f"Prepared dataset missing or empty at {data_path}")
         df = pd.read_csv(data_path)
+        if df.empty:
+            raise EmptyDataError(f"Prepared dataset is empty at {data_path}")
         return df
-    except Exception as e:
-        st.warning(f"Dataset not found. Country selector disabled.")
-        return None
+    except Exception:
+        try:
+            if raw_confirmed_path.exists():
+                raw_df = pd.read_csv(raw_confirmed_path, usecols=['Country/Region'])
+                raw_df = raw_df.dropna().drop_duplicates().reset_index(drop=True)
+                if not raw_df.empty:
+                    return raw_df
+        except Exception:
+            pass
+
+        st.info("Country dataset unavailable in this deployment. Showing a built-in fallback list instead.")
+        return pd.DataFrame({'Country/Region': FALLBACK_COUNTRIES})
 
 # Main app
 def main():

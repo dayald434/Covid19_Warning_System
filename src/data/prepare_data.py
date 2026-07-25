@@ -397,6 +397,24 @@ def load_and_prepare_data():
         ),
         axis=1
     )
+
+    # Drop rows without a valid target and create canonical columns used by tests
+    df = df.dropna(subset=[TARGET_COL]).copy()
+    df['Warning_Level'] = df[TARGET_COL]
+    df['Case_Fatality_Rate'] = df['CFR'].clip(lower=0, upper=100)
+    df['Cases_7day_avg'] = df['Cases_7d_MA']
+    df['Deaths_7day_avg'] = df['Deaths_7d_MA']
+
+    # Fill remaining missing feature values with neutral values for reliable training
+    feature_cols = [
+        col for col in df.columns
+        if col not in ['Warning_Level', 'Warning_Level_7d_Ahead', 'Province/State', 'Country/Region', 'Date', 'Lat', 'Long', 'NPI_Phase', 'Vaccine_Period']
+    ]
+    numeric_feature_cols = df[feature_cols].select_dtypes(include=[np.number]).columns
+    for col in numeric_feature_cols:
+        df[col] = df[col].fillna(0)
+    for col in [col for col in feature_cols if col not in numeric_feature_cols]:
+        df[col] = df[col].fillna('')
     
     print(f"\n✓ Created target variable: {TARGET_COL}")
     print("\nWarning level distribution:")
